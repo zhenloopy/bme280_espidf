@@ -55,7 +55,9 @@ extern "C" {
 #endif
 
 /* Header includes */
+#include "esp_err.h"
 #include "bme280_defs.h"
+#include "driver/i2c.h"
 
 /**
  * \ingroup bme280
@@ -395,3 +397,6 @@ int8_t bme280_cal_meas_delay(uint32_t *max_delay, const struct bme280_settings *
 #endif /* End of CPP guard */
 #endif /* _BME280_H */
 /** @}*/
+
+
+/* these are functions to replace the coines I2C functions */

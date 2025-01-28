@@ -111,6 +111,14 @@
 #define BME280_INTF_RET_TYPE                      int8_t
 #endif
 
+#ifndef I2C_PORTS_PINS
+#define I2C_PORTS_PINS
+#define I2C_NUM I2C_NUM_0
+#define I2C_SCL GPIO_NUM_22
+#define I2C_SDA GPIO_NUM_21
+#define address 0x76
+#endif
+
 /*!
  * The last error code from read/write interface is stored in the device structure as intf_rslt.
  */

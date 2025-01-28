@@ -40,6 +40,7 @@
  * @brief Sensor driver for BME280 sensor
  */
 #include "bme280.h"
+#include <stdio.h>
 
 /**\name Internal macros */
 /* To identify osr settings selected by user */
@@ -421,6 +422,7 @@ int8_t bme280_init(struct bme280_dev *dev)
     /* Check for chip id validity */
     if (rslt == BME280_OK)
     {
+		printf("chip id seen\n");
         if (chip_id == BME280_CHIP_ID)
         {
             dev->chip_id = chip_id;
@@ -432,11 +434,11 @@ int8_t bme280_init(struct bme280_dev *dev)
             {
                 /* Read the calibration data */
                 rslt = get_calib_data(dev);
-            }
+            } else {rslt = (int8_t) 2;}
         }
         else
         {
-            rslt = BME280_E_DEV_NOT_FOUND;
+            rslt = (int8_t) 1; //BME280_E_DEV_NOT_FOUND;
         }
     }
 
@@ -1568,4 +1570,18 @@ static int8_t null_ptr_check(const struct bme280_dev *dev)
     }
 
     return rslt;
+}
+
+
+/* external API's used to read, set registers */
+
+esp_err_t bme280Read(uint8_t Reg, uint8_t *ReadBuffer, uint32_t len, void *intf_ptr) {
+	return (i2c_master_write_read_device(I2C_NUM, address, &Reg, 1, ReadBuffer, len, 2000));
+}
+
+esp_err_t bme280Write(uint8_t Reg, const uint8_t *data, uint32_t length, void *intf_ptr) {
+	uint8_t writeBuf[2];
+	writeBuf[0] = Reg;
+	writeBuf[1] = (uint8_t) *data;
+	return (i2c_master_write_to_device(I2C_NUM, address, writeBuf, 2, 1000));
 }
