@@ -15,7 +15,7 @@
 
 #define BME280_ADDR 0x76
 #define BME280_WHO_AM_I_ADDR 0xD0
-#define BME280_POWER_MGMT_ADDR 0x74 // bits 1, 0
+#define BME280_POWER_MGMT_ADDR 0xF4 // bits 1, 0
 #define BME280_TEMP_ADDR 0xFB
 #define BME280_CTRL_TEMP_ADDR 0xF4 // bits 7, 6, 5
 #define BME280_HUM_ADDR 0xFE
@@ -72,17 +72,42 @@ static esp_err_t bme280_register_write_byte(i2c_master_dev_handle_t dev_handle, 
 	return i2c_master_transmit(dev_handle, write_buf, sizeof(write_buf), I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
 }
 
-static void bme280_power_mode(int8_t p) {
+static void bme280_power_mode(uint8_t p) {
 	uint8_t powerSet[1];
-
 	ESP_ERROR_CHECK(bme280_register_read(dev_handle, BME280_POWER_MGMT_ADDR, powerSet, 1));
 
 	if (p == 0) {powerSet[0] = powerSet[0] & ~3;}
-	else if (p == 1) {powerSet[0] = (powerSet[0] & ~3) | (2 & 3);}
+	else if (p == 1) {powerSet[0] = (powerSet[0] & ~3) | 2;}
 	else if (p == 2) {powerSet[0] = powerSet[0] | 3;}
 
 	ESP_ERROR_CHECK(bme280_register_write_byte(dev_handle, BME280_POWER_MGMT_ADDR, powerSet[0]));
-	ESP_LOGI(TAG, "Power mode: %b", (powerSet[0] & ~3));
+}
+
+static void bme280_hum_sample(uint8_t p) {
+	uint8_t sampleSet[1];
+	ESP_ERROR_CHECK(bme280_register_read(dev_handle, BME280_CTRL_HUM_ADDR, sampleSet, 1));
+
+	if (p == 1) {sampleSet[0] = (sampleSet[0] & ~7) | 1;}
+
+	ESP_ERROR_CHECK(bme280_register_write_byte(dev_handle, BME280_CTRL_HUM_ADDR, sampleSet[0]));
+}
+
+static void bme280_temp_sample(uint8_t p) {
+	uint8_t sampleSet[1];
+	ESP_ERROR_CHECK(bme280_register_read(dev_handle, BME280_CTRL_TEMP_ADDR, sampleSet, 1));
+
+	if (p == 1) {sampleSet[0] = (sampleSet[0] & ~224) | 32;}
+
+	ESP_ERROR_CHECK(bme280_register_write_byte(dev_handle, BME280_CTRL_TEMP_ADDR, sampleSet[0]));
+}
+
+static void bme280_press_sample(uint8_t p) {
+	uint8_t sampleSet[1];
+	ESP_ERROR_CHECK(bme280_register_read(dev_handle, BME280_CTRL_PRESS_ADDR, sampleSet, 1));
+
+	if (p == 1) {sampleSet[0] = (sampleSet[0] & ~28) | 4;}
+
+	ESP_ERROR_CHECK(bme280_register_write_byte(dev_handle, BME280_CTRL_PRESS_ADDR, sampleSet[0]));
 }
 
 struct weatherData {
@@ -105,18 +130,22 @@ struct weatherData bme280_weather_monitor() {
 void app_main(void)
 {
 	while(1) {
-		uint8_t whoami[2];
-		
-		uint8_t temp[1];
-		uint8_t hum[1];
-		uint8_t press[1];
-
 		i2c_master_init(&bus_handle, &dev_handle);
-		ESP_LOGI(TAG, "I2C initialized successfully\n");
+		ESP_LOGI(TAG, "I2C initialized successfully");
 
-		ESP_ERROR_CHECK(bme280_register_read(dev_handle, BME280_WHO_AM_I_ADDR, whoami, 1)); //data[0] is who_am_i value
-		
-		ESP_ERROR_CHECK(bme280_register_write_byte(dev_handle, BME280_POWER_MGMT_ADDR, 3));
+		uint8_t temp_press_power[1];
+		uint8_t hum[1];
+		bme280_hum_sample(1);
+		bme280_power_mode(1);
+		bme280_press_sample(1);
+		bme280_temp_sample(1);
+
+		ESP_ERROR_CHECK(bme280_register_read(dev_handle, BME280_POWER_MGMT_ADDR, temp_press_power, 1));
+		ESP_LOGI(TAG, "should be 38: %u", temp_press_power[0]);
+
+		ESP_ERROR_CHECK(bme280_register_read(dev_handle, BME280_CTRL_HUM_ADDR, hum, 1));
+		ESP_LOGI(TAG, "should be 1: %u", hum[0]);
+
 
 		i2c_master_deinit(bus_handle, dev_handle);
 		ESP_LOGI(TAG, "I2C deinitialized successfully\n");
