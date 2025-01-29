@@ -26,6 +26,9 @@
 
 static const char *TAG = "MAIN";
 
+i2c_master_bus_handle_t bus_handle;
+i2c_master_dev_handle_t dev_handle;
+
 
 /* I2C INIT AND DEINIT */
 
@@ -56,7 +59,7 @@ static void i2c_master_deinit(i2c_master_bus_handle_t bus_handle, i2c_master_dev
 }
 
 
-/* BME280 SPECIFIC LOGGING */
+/* BME280 SPECIFIC LOGIC */
 
 static esp_err_t bme280_register_read(i2c_master_dev_handle_t dev_handle, uint8_t reg_addr, uint8_t *data, size_t len) 
 {
@@ -69,13 +72,26 @@ static esp_err_t bme280_register_write_byte(i2c_master_dev_handle_t dev_handle, 
 	return i2c_master_transmit(dev_handle, write_buf, sizeof(write_buf), I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
 }
 
+static void bme280_power_mode(int8_t p) {
+	uint8_t powerSet[1];
+
+	ESP_ERROR_CHECK(bme280_register_read(dev_handle, BME280_POWER_MGMT_ADDR, powerSet, 1));
+
+	if (p == 0) {powerSet[0] = powerSet[0] & ~3;}
+	else if (p == 1) {powerSet[0] = (powerSet[0] & ~3) | (2 & 3);}
+	else if (p == 2) {powerSet[0] = powerSet[0] | 3;}
+
+	ESP_ERROR_CHECK(bme280_register_write_byte(dev_handle, BME280_POWER_MGMT_ADDR, powerSet[0]));
+	ESP_LOGI(TAG, "Power mode: %b", (powerSet[0] & ~3));
+}
+
 struct weatherData {
 	int32_t temp;
 	uint32_t hum;
 	uint32_t press;
 };
 
-struct weatherData bme280_weather_monitor(i2c_master_bus_handle_t bus_handle, i2c_master_dev_handle_t dev_handle) {
+struct weatherData bme280_weather_monitor() {
 	struct weatherData data;
 	data.temp = 0;
 	data.hum = 0;
@@ -90,22 +106,16 @@ void app_main(void)
 {
 	while(1) {
 		uint8_t whoami[2];
-		uint8_t powerSet[2];
 		
 		uint8_t temp[1];
 		uint8_t hum[1];
 		uint8_t press[1];
 
-		i2c_master_bus_handle_t bus_handle;
-		i2c_master_dev_handle_t dev_handle;
 		i2c_master_init(&bus_handle, &dev_handle);
 		ESP_LOGI(TAG, "I2C initialized successfully\n");
 
 		ESP_ERROR_CHECK(bme280_register_read(dev_handle, BME280_WHO_AM_I_ADDR, whoami, 1)); //data[0] is who_am_i value
 		
-		ESP_ERROR_CHECK(bme280_register_read(dev_handle, BME280_POWER_MGMT_ADDR, powerSet, 1));
-		ESP_LOGI(TAG, "current full 0xF4 register: %b", powerSet[0]);
-
 		ESP_ERROR_CHECK(bme280_register_write_byte(dev_handle, BME280_POWER_MGMT_ADDR, 3));
 
 		i2c_master_deinit(bus_handle, dev_handle);
