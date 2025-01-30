@@ -24,6 +24,25 @@
 #define BME280_CTRL_PRESS_ADDR 0xF4 // bits 4, 3, 2
 #define BME280_RESET_ADDR 0xE0 // write as 0xB6 to reset
 
+
+/* DEFINING TYPES FOR BME280 CONFIG */
+
+typedef enum samplingConfig{
+	BME280_SAMPLE_OFF = 0,
+	BME280_SAMPLE_1  = 1,
+	BME280_SAMPLE_2 = 2,
+	BME280_SAMPLE_4 = 4,
+	BME280_SAMPLE_8 = 8,
+	BME280_SAMPLE_16 = 16
+} bme280_sample_t;
+
+typedef enum powerConfig{
+	BME280_SLEEP = 0,
+	BME280_FORCED = 1,
+	BME280_NORMAL = 3,
+} bme280_power_t;
+
+
 static const char *TAG = "MAIN";
 
 i2c_master_bus_handle_t bus_handle;
@@ -72,7 +91,7 @@ static esp_err_t bme280_register_write_byte(i2c_master_dev_handle_t dev_handle, 
 	return i2c_master_transmit(dev_handle, write_buf, sizeof(write_buf), I2C_MASTER_TIMEOUT_MS / portTICK_PERIOD_MS);
 }
 
-static void bme280_power_mode(uint8_t p) {
+static void bme280_power_mode(bme280_power_t p) {
 	uint8_t powerSet[1];
 	ESP_ERROR_CHECK(bme280_register_read(dev_handle, BME280_POWER_MGMT_ADDR, powerSet, 1));
 
@@ -83,29 +102,44 @@ static void bme280_power_mode(uint8_t p) {
 	ESP_ERROR_CHECK(bme280_register_write_byte(dev_handle, BME280_POWER_MGMT_ADDR, powerSet[0]));
 }
 
-static void bme280_hum_sample(uint8_t p) {
+static void bme280_hum_sample(bme280_sample_t s) {
 	uint8_t sampleSet[1];
 	ESP_ERROR_CHECK(bme280_register_read(dev_handle, BME280_CTRL_HUM_ADDR, sampleSet, 1));
 
-	if (p == 1) {sampleSet[0] = (sampleSet[0] & ~7) | 1;}
+	if (s == BME280_SAMPLE_OFF) {sampleSet[0] = (sampleSet[0] & ~7);}
+	else if (s == BME280_SAMPLE_1) {sampleSet[0] = (sampleSet[0] & ~7) | 1;}
+	else if (s == BME280_SAMPLE_2) {sampleSet[0] = (sampleSet[0] & ~7) | 2;}
+	else if (s == BME280_SAMPLE_4) {sampleSet[0] = (sampleSet[0] & ~7) | 3;}
+	else if (s == BME280_SAMPLE_8) {sampleSet[0] = (sampleSet[0] & ~7) | 4;}
+	else if (s == BME280_SAMPLE_16) {sampleSet[0] = (sampleSet[0] & ~7) | 5;}
 
 	ESP_ERROR_CHECK(bme280_register_write_byte(dev_handle, BME280_CTRL_HUM_ADDR, sampleSet[0]));
 }
 
-static void bme280_temp_sample(uint8_t p) {
+static void bme280_temp_sample(bme280_sample_t s) {
 	uint8_t sampleSet[1];
 	ESP_ERROR_CHECK(bme280_register_read(dev_handle, BME280_CTRL_TEMP_ADDR, sampleSet, 1));
 
-	if (p == 1) {sampleSet[0] = (sampleSet[0] & ~224) | 32;}
+	if (s == BME280_SAMPLE_OFF) {sampleSet[0] = (sampleSet[0] & ~224);}
+	else if (s == BME280_SAMPLE_1) {sampleSet[0] = (sampleSet[0] & ~224) | 32;}
+	else if (s == BME280_SAMPLE_2) {sampleSet[0] = (sampleSet[0] & ~224) | 64;}
+	else if (s == BME280_SAMPLE_4) {sampleSet[0] = (sampleSet[0] & ~224) | 96;}
+	else if (s == BME280_SAMPLE_8) {sampleSet[0] = (sampleSet[0] & ~224) | 128;}
+	else if (s == BME280_SAMPLE_16) {sampleSet[0] = (sampleSet[0] & ~224) | 160;}
 
 	ESP_ERROR_CHECK(bme280_register_write_byte(dev_handle, BME280_CTRL_TEMP_ADDR, sampleSet[0]));
 }
 
-static void bme280_press_sample(uint8_t p) {
+static void bme280_press_sample(bme280_sample_t s) {
 	uint8_t sampleSet[1];
 	ESP_ERROR_CHECK(bme280_register_read(dev_handle, BME280_CTRL_PRESS_ADDR, sampleSet, 1));
 
-	if (p == 1) {sampleSet[0] = (sampleSet[0] & ~28) | 4;}
+	if (s == BME280_SAMPLE_OFF) {sampleSet[0] = (sampleSet[0] & ~28);}
+	else if (s == BME280_SAMPLE_1) {sampleSet[0] = (sampleSet[0] & ~28) | 4;}
+	else if (s == BME280_SAMPLE_2) {sampleSet[0] = (sampleSet[0] & ~28) | 8;}
+	else if (s == BME280_SAMPLE_4) {sampleSet[0] = (sampleSet[0] & ~28) | 12;}
+	else if (s == BME280_SAMPLE_8) {sampleSet[0] = (sampleSet[0] & ~28) | 16;}
+	else if (s == BME280_SAMPLE_16) {sampleSet[0] = (sampleSet[0] & ~28) | 20;}
 
 	ESP_ERROR_CHECK(bme280_register_write_byte(dev_handle, BME280_CTRL_PRESS_ADDR, sampleSet[0]));
 }
@@ -135,17 +169,10 @@ void app_main(void)
 
 		uint8_t temp_press_power[1];
 		uint8_t hum[1];
-		bme280_hum_sample(1);
-		bme280_power_mode(1);
-		bme280_press_sample(1);
-		bme280_temp_sample(1);
-
-		ESP_ERROR_CHECK(bme280_register_read(dev_handle, BME280_POWER_MGMT_ADDR, temp_press_power, 1));
-		ESP_LOGI(TAG, "should be 38: %u", temp_press_power[0]);
-
-		ESP_ERROR_CHECK(bme280_register_read(dev_handle, BME280_CTRL_HUM_ADDR, hum, 1));
-		ESP_LOGI(TAG, "should be 1: %u", hum[0]);
-
+		bme280_hum_sample(BME280_SAMPLE_1);
+		bme280_power_mode(BME280_SAMPLE_1);
+		bme280_press_sample(BME280_SAMPLE_1);
+		bme280_temp_sample(BME280_SAMPLE_1);
 
 		i2c_master_deinit(bus_handle, dev_handle);
 		ESP_LOGI(TAG, "I2C deinitialized successfully\n");
