@@ -125,28 +125,15 @@ void taskMeasure(void * params) {
 	rslt = bme280_get_sensor_settings(&settings, &dev);
 	bme280_error_codes_print_result("bme280_get_sensor_settings", rslt);
 
-	settings.filter = BME280_FILTER_COEFF_OFF;
-	settings.osr_h = BME280_OVERSAMPLING_1X;
-	settings.osr_p = BME280_OVERSAMPLING_1X;
-	settings.osr_t = BME280_OVERSAMPLING_1X;
+	settings.filter = BME280_FILTER_COEFF_16;
+	settings.osr_h = BME280_OVERSAMPLING_16X;
+	settings.osr_p = BME280_OVERSAMPLING_16X;
+	settings.osr_t = BME280_OVERSAMPLING_16X;
 	uint8_t changeSettings = BME280_SEL_ALL_SETTINGS;
 
 	rslt = bme280_set_sensor_settings(changeSettings, &settings, &dev);
 	bme280_error_codes_print_result("bme280_set_sensor_settings", rslt);
 
-		uint8_t status;
-		uint8_t readSettings[1];
-		uint8_t writeSettings[1] = {32};
-
-		status = bme280_i2c_write(0xF4, writeSettings);
-		status = bme280_i2c_read(0xF4, readSettings, 1);
-
-		printf("what's in our settings config MANUAL WRITE: %u\n\n", readSettings[0]);
-	
-
-
-	rslt = bme280_set_sensor_mode(BME280_POWERMODE_FORCED, &dev);
-	bme280_error_codes_print_result("bme280_set_sensor_mode", rslt);
 	rslt = bme280_cal_meas_delay(&period, &settings);
 
 	while(1) {
@@ -156,11 +143,13 @@ void taskMeasure(void * params) {
 		rslt = bme280_get_sensor_data(BME280_ALL, &comp_data, &dev);
 		bme280_error_codes_print_result("bme280_get_sensor_data", rslt);
 
-		printf("temperature: %f\n", comp_data.temperature);
-		printf("humidity: %f\n", comp_data.humidity);
-		printf("pressure: %f\n\n", comp_data.pressure);
+		comp_data.temperature = comp_data.temperature * (9.0 / 5.0) + 32;
 
-		vTaskDelay(200 / portTICK_PERIOD_MS);
+		printf("temperature: %f F\n", comp_data.temperature);
+		printf("humidity: %f%%\n", comp_data.humidity);
+		printf("pressure: %f Pa\n\n", comp_data.pressure);
+
+		vTaskDelay(20 / portTICK_PERIOD_MS);
 	}
 	vTaskDelete(NULL);
 }
